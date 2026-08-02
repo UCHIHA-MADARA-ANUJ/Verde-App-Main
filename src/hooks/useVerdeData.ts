@@ -85,15 +85,19 @@ async function pollFirebase() {
     const newUrl = latest_scan.imageUrl || "";
     const prevCapturedAt = s.latestScan?.captured_at;
     const newCapturedAt = (latest_scan as any).captured_at;
-    const isNewPhoto = !!newUrl && (newUrl !== prevUrl || (newCapturedAt && newCapturedAt !== prevCapturedAt));
+    const expecting = s.expectingNewPhoto;
+    const urlChanged = newUrl && newUrl !== prevUrl;
+    const timeChanged = newCapturedAt && newCapturedAt !== prevCapturedAt;
+    const isNewPhoto = !!newUrl && (expecting || urlChanged || timeChanged);
     if (isNewPhoto) {
+      s.setExpectingNewPhoto(false);
       const img = {
         dataUrl: newUrl, source: "cam" as const, name: "cam-capture",
         ts: (latest_scan as any).captured_at || (latest_scan as any).timestamp || Date.now(),
       };
       s.setCurrentImage(img);
       s.setNewPhotoFlash(true);
-      s.log("ok", "firebase", "📸 NEW CAM photo detected");
+      s.log("ok", "firebase", "📸 NEW CAM photo detected — frame updated");
       s.pushNotification({ level: "info", title: "New CAM photo", body: "Fresh capture from ESP32", icon: "📸" });
       if (s.settings.soundEnabled) sfx.shutter();
       setTimeout(() => s.setNewPhotoFlash(false), 4000);

@@ -60,6 +60,7 @@ interface VerdeStore {
   lastPollTs: number;
   pollCount: number;
   newPhotoFlash: boolean;
+  expectingNewPhoto: boolean;
 
   // ---- Core data ----
   sensors: Sensors;
@@ -165,6 +166,7 @@ interface VerdeStore {
   resetTankCalibration: () => void;
   tankDisplayed: (raw: number | null | undefined) => number | null;
   setNewPhotoFlash: (b: boolean) => void;
+  setExpectingNewPhoto: (b: boolean) => void;
   startTour: () => void;
   nextTourStep: () => void;
   prevTourStep: () => void;
@@ -181,6 +183,7 @@ const initialState = {
   lastPollTs: 0,
   pollCount: 0,
   newPhotoFlash: false,
+  expectingNewPhoto: false,
   tankCalibration: { empty: null, full: null },
 
   sensors: {} as Sensors,
@@ -351,6 +354,7 @@ export const useVerdeStore = create<VerdeStore>()(
         return Math.max(0, Math.min(100, Math.round(pct)));
       },
       setNewPhotoFlash: (b: boolean) => set({ newPhotoFlash: b }),
+      setExpectingNewPhoto: (b: boolean) => set({ expectingNewPhoto: b }),
 
       startTour: () => set({ tourActive: true, tourStep: 0, tourComplete: false }),
       nextTourStep: () => set(s => {

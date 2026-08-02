@@ -6,7 +6,7 @@ import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
 import { sfx } from "@/lib/sound";
 import { fetchWeather, fetchForecast, fbPatch } from "@/lib/services";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function WeatherCard() {
   const weather = useVerdeStore(s => s.weather);
@@ -14,6 +14,7 @@ export function WeatherCard() {
   const lastCheck = useVerdeStore(s => s.lastWeatherCheck);
   const controls = useVerdeStore(s => s.controls);
   const city = useVerdeStore(s => s.settings.city);
+  const weatherIntervalMin = useVerdeStore(s => s.settings.weatherIntervalMinutes);
   const setWeather = useVerdeStore(s => s.setWeather);
   const setLastWeatherCheck = useVerdeStore(s => s.setLastWeatherCheck);
   const setControls = useVerdeStore(s => s.setControls);
@@ -21,6 +22,20 @@ export function WeatherCard() {
   const log = useVerdeStore(s => s.log);
   const pushNotification = useVerdeStore(s => s.pushNotification);
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState<number>(weatherIntervalMin * 60);
+
+  // Countdown tick
+  useEffect(() => {
+    const t = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  // Reset countdown when weather is refreshed
+  useEffect(() => {
+    if (lastCheck) setCountdown(weatherIntervalMin * 60);
+  }, [lastCheck, weatherIntervalMin]);
+  const cdMin = Math.floor(countdown/60);
+  const cdSec = countdown % 60;
+  const cdStr = `${cdMin}:${cdSec.toString().padStart(2,"0")}`;
 
   const refresh = async () => {
     sfx.click(); setLoading(true);
@@ -90,21 +105,24 @@ export function WeatherCard() {
       }`}>
         {rain
           ? `☔ Rain detected (${weather?.description || "override active"}) — auto-watering suspended.`
-          : "✅ Clear — watering allowed. Auto-checking every 10 minutes."}
+          : `✅ Clear — watering allowed. Auto-checking every ${weatherIntervalMin} minutes.`}
       </div>
 
       <div className="mt-4 space-y-1">
         <Row label="🌧 Rain Override" sub="Auto-set when rain is forecast">
           <span className={`font-mono font-bold text-sm ${rain ? "text-red" : "text-green-glow"}`}>{rain ? "ON (auto)" : "OFF"}</span>
         </Row>
-        <Row label="Last check" sub="Auto-refresh every 10 min">
+        <Row label="Last check" sub="Auto-refresh on interval">
           <span className="font-mono text-sm text-slate-300">{lastCheck || "--"}</span>
+        </Row>
+        <Row label="Next auto-check" sub="countdown">
+          <span className="font-mono text-sm text-sky tabular-nums">{cdStr}</span>
         </Row>
       </div>
 
       <Button variant="green" className="w-full mt-4 justify-center" onClick={refresh} disabled={loading}>
         <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-        {loading ? "CHECKING…" : "CHECK WEATHER NOW"}
+        {loading ? "CHECKING…" : "🔍 CHECK WEATHER NOW"}
       </Button>
 
       <div className="mt-2 font-mono text-[10px] text-slate-500 break-all">

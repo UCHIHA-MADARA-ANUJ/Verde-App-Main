@@ -80,13 +80,18 @@ export function PlantDoctorCard() {
 
   const triggerCam = async () => {
     sfx.click();
-    log("info", "plant-dr", "📸 Triggering ESP32 CAM capture…");
+    log("info", "plant-dr", "📸 Triggering ESP32 CAM capture (sets /controls/capture_photo=true)…");
     setWaitingCam(true);
+    useVerdeStore.getState().setExpectingNewPhoto(true);
     try {
       await setCtrl("capture_photo", true);
       setTimeout(() => setCtrl("capture_photo", false).catch(()=>{}), 4000);
-      setTimeout(() => setWaitingCam(false), 6000);
-    } catch(e:any) { log("err","plant-dr",e.message); setWaitingCam(false); }
+      setTimeout(() => setWaitingCam(false), 8000);
+    } catch(e:any) {
+      log("err","plant-dr",`Capture trigger FAILED: ${e.message}`);
+      setWaitingCam(false);
+      useVerdeStore.getState().setExpectingNewPhoto(false);
+    }
   };
 
   const useCam = () => {
@@ -170,6 +175,16 @@ export function PlantDoctorCard() {
 
       <div className="mt-2 font-mono text-[10px] text-slate-500">
         Current image: {currentImage ? `${currentImage.name} · ${sourceLabel}` : "none"}
+        {currentImage?.source === "cam" && latestScan?.captured_at && (
+          <span className="ml-2 text-green-glow/70">
+            captured {new Date(typeof latestScan.captured_at === "number" ? latestScan.captured_at : Date.now()).toLocaleTimeString([], {hour12:false})}
+          </span>
+        )}
+        {currentImage?.ts && currentImage.source !== "cam" && (
+          <span className="ml-2 text-sky/70">
+            uploaded {new Date(currentImage.ts).toLocaleTimeString([], {hour12:false})}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mt-3">
