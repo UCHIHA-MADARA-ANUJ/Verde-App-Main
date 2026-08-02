@@ -388,17 +388,29 @@ export const useVerdeStore = create<VerdeStore>()(
         tourComplete: s.tourComplete,
         geminiMsgs: s.geminiMsgs.slice(-50),
         orMsgs: s.orMsgs.slice(-50),
+        tankCalibration: s.tankCalibration,
       }),
-      onRehydrateStorage: () => (state) => {
-        // reload persisted history from localStorage too
+      // Load extra persisted bits from localStorage AFTER rehydration (safe, via setState)
+      onRehydrateStorage: () => (state, error) => {
+        if (!state || error) return;
         try {
           const raw = localStorage.getItem("verde_history_v2");
-          if (raw && state) (state as any).history = JSON.parse(raw);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length) {
+              // Merge: use localStorage history if it's longer (backup)
+              if (!state.history || parsed.length > (state.history?.length || 0)) {
+                (state as any).history = parsed;
+              }
+            }
+          }
         } catch {}
-        // reload tank calibration
         try {
           const tc = localStorage.getItem("verde_tank_cal");
-          if (tc && state) (state as any).tankCalibration = JSON.parse(tc);
+          if (tc) {
+            const parsed = JSON.parse(tc);
+            if (parsed && typeof parsed === "object") (state as any).tankCalibration = parsed;
+          }
         } catch {}
       },
     }

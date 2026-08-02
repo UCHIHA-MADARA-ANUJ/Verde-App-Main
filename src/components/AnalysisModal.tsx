@@ -19,7 +19,6 @@ export function AnalysisModal() {
   const sensors = useVerdeStore(s => s.sensors);
   const controls = useVerdeStore(s => s.controls);
   const log = useVerdeStore(s => s.log);
-  const setApiStatus = useVerdeStore(s => s.setApiStatus);
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");

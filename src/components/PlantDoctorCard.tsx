@@ -1,6 +1,6 @@
 "use client";
-import { Camera, Upload, Leaf, Loader2, Aperture, Scan } from "lucide-react";
-import { useRef, useState } from "react";
+import { Camera, Upload, Leaf, Aperture, Scan } from "lucide-react";
+import { useRef, useState, useMemo } from "react";
 import { useVerdeStore } from "@/store/verde-store";
 import { Card, CardHeader, CardTitle } from "./ui/Card";
 import { Badge } from "./ui/Badge";
@@ -18,17 +18,18 @@ export function PlantDoctorCard() {
   const analysisProgress = useVerdeStore(s => s.analysisProgress);
   const newPhotoFlash = useVerdeStore(s => s.newPhotoFlash);
   const latestScan = useVerdeStore(s => s.latestScan);
-  const logs = useVerdeStore(s => s.logs.filter(l => ["plant-dr","firebase","camera","calibration"].includes(l.source)).slice(-20));
+  const allLogs = useVerdeStore(s => s.logs);
   const setCurrentImage = useVerdeStore(s => s.setCurrentImage);
   const setPlantResult = useVerdeStore(s => s.setPlantResult);
   const setAnalysing = useVerdeStore(s => s.setAnalysing);
   const addHistoryItem = useVerdeStore(s => s.addHistoryItem);
-  const addModalChatMsg = useVerdeStore(s => s.addModalChatMsg);
   const openModal = useVerdeStore(s => s.openModal);
   const log = useVerdeStore(s => s.log);
   const setApiStatus = useVerdeStore(s => s.setApiStatus);
   const pushNotification = useVerdeStore(s => s.pushNotification);
   const autoOpen = useVerdeStore(s => s.settings.autoOpenModalOnAnalysis);
+
+  const logs = useMemo(() => allLogs.filter(l => ["plant-dr","firebase","camera","calibration"].includes(l.source)).slice(-20), [allLogs]);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
