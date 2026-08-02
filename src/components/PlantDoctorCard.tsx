@@ -7,7 +7,7 @@ import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
 import { identifyPlant, parseKindwiseResult, setCtrl } from "@/lib/services";
 import { sfx } from "@/lib/sound";
-import { toDataUrlFromFile, resizeImage } from "@/lib/utils";
+import { toDataUrlFromFile, resizeImage, cn } from "@/lib/utils";
 import { ProgressBar } from "./ui/ProgressBar";
 import { Terminal } from "./ui/Terminal";
 
@@ -16,7 +16,9 @@ export function PlantDoctorCard() {
   const plantResult = useVerdeStore(s => s.plantResult);
   const analysing = useVerdeStore(s => s.analysing);
   const analysisProgress = useVerdeStore(s => s.analysisProgress);
-  const logs = useVerdeStore(s => s.logs.filter(l => ["plant-dr","firebase","camera"].includes(l.source)).slice(-20));
+  const newPhotoFlash = useVerdeStore(s => s.newPhotoFlash);
+  const latestScan = useVerdeStore(s => s.latestScan);
+  const logs = useVerdeStore(s => s.logs.filter(l => ["plant-dr","firebase","camera","calibration"].includes(l.source)).slice(-20));
   const setCurrentImage = useVerdeStore(s => s.setCurrentImage);
   const setPlantResult = useVerdeStore(s => s.setPlantResult);
   const setAnalysing = useVerdeStore(s => s.setAnalysing);
@@ -130,13 +132,27 @@ export function PlantDoctorCard() {
       <div className="relative w-full h-52 bg-black rounded-xl border border-border overflow-hidden flex items-center justify-center">
         {currentImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={currentImage.dataUrl} alt="current plant" className="w-full h-full object-contain" />
+          <img
+            src={currentImage.dataUrl}
+            alt="current plant"
+            className={cn("w-full h-full object-contain", currentImage.source === "cam" && "rotate-180")}
+          />
         ) : (
           <div className="text-center text-slate-600 font-mono text-xs p-4">
             <Aperture className="w-10 h-10 mx-auto mb-2 opacity-30" />
             No image loaded.<br/>
             <span className="text-slate-500">Capture from ESP32, snap with device, or upload.</span>
           </div>
+        )}
+        {newPhotoFlash && currentImage?.source === "cam" && (
+          <div className="absolute top-2 right-2 bg-red text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
+            ● LIVE NEW
+          </div>
+        )}
+        {currentImage?.source === "cam" && (
+          <span className="absolute top-2 left-2 text-[9px] font-mono px-1.5 py-0.5 bg-purple/20 text-purple-glow border border-purple/40 rounded">
+            CAM 180°
+          </span>
         )}
         {analysing && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">

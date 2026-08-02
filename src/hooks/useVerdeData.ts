@@ -80,12 +80,23 @@ async function pollFirebase() {
     });
     s.tickPoll();
 
-    // Auto-load latest cam image
-    if (latest_scan.imageUrl && !s.currentImage) {
-      useVerdeStore.getState().setCurrentImage({
-        dataUrl: latest_scan.imageUrl, source: "cam", name: "cam-capture", ts: latest_scan.timestamp ?? Date.now(),
-      });
-      s.log("info", "firebase", "Loaded latest CAM photo from RTDB");
+    // Detect new CAM photo (url changed or capture_photo was just triggered)
+    const prevUrl = s.latestScan?.imageUrl || "";
+    const newUrl = latest_scan.imageUrl || "";
+    const prevCapturedAt = s.latestScan?.captured_at;
+    const newCapturedAt = (latest_scan as any).captured_at;
+    const isNewPhoto = !!newUrl && (newUrl !== prevUrl || (newCapturedAt && newCapturedAt !== prevCapturedAt));
+    if (isNewPhoto) {
+      const img = {
+        dataUrl: newUrl, source: "cam" as const, name: "cam-capture",
+        ts: (latest_scan as any).captured_at || (latest_scan as any).timestamp || Date.now(),
+      };
+      s.setCurrentImage(img);
+      s.setNewPhotoFlash(true);
+      s.log("ok", "firebase", "📸 NEW CAM photo detected");
+      s.pushNotification({ level: "info", title: "New CAM photo", body: "Fresh capture from ESP32", icon: "📸" });
+      if (s.settings.soundEnabled) sfx.shutter();
+      setTimeout(() => s.setNewPhotoFlash(false), 4000);
     }
 
     // Threshold sync
@@ -117,16 +128,17 @@ async function pollFirebase() {
       }
     }
     if (sensors.tank_level != null && controls.tank_threshold != null && controls.tank_threshold > 0) {
-      if (sensors.tank_level < controls.tank_threshold) {
+      const tankDisp = s.tankDisplayed(sensors.tank_level) ?? sensors.tank_level;
+      if (tankDisp < controls.tank_threshold) {
         if (cooldown("tank", 120000)) {
           s.pushNotification({
             level: "err",
             title: "Reservoir low",
-            body: `Tank ${sensors.tank_level}% — pump locked below ${controls.tank_threshold}%`,
+            body: `Tank ${Math.round(tankDisp)}% — pump locked below ${controls.tank_threshold}%`,
             icon: "🛢️",
           });
           if (th.soundEnabled) sfx.error();
-          notify("VERDE OS", `Reservoir low (${sensors.tank_level}%) — refill needed`);
+          notify("VERDE OS", `Reservoir low (${Math.round(tankDisp)}%) — refill needed`);
         }
       }
     }

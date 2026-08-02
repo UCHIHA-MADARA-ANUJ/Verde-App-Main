@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { AlertToaster } from "@/components/AlertToaster";
 import { BootScreen } from "@/components/BootScreen";
 import { Tour } from "@/components/onboarding/Tour";
+import { AnalysisModal } from "@/components/AnalysisModal";
 import { useVerdeData } from "@/hooks/useVerdeData";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useVerdeStore } from "@/store/verde-store";
@@ -42,6 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen flex">
       <AlertToaster />
+      <AnalysisModal />
       {tourActive && <Tour />}
       {showBoot ? (
         <BootScreen onDone={() => setBooted(true)} />

@@ -58,6 +58,7 @@ export interface Controls {
 export interface LatestScan {
   imageUrl?: string;
   timestamp?: number;
+  captured_at?: number | string;
   metadata?: {
     width?: number;
     height?: number;

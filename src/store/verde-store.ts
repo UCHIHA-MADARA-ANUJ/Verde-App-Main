@@ -9,7 +9,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   Sensors, Controls, Weather, VerdeImage, PlantResult,
   HistoryItem, SensorHistoryPoint, PlantProfile, AppLog, NotificationItem,
-  AppSettings, DiagnosticResult, AppTourStep
+  AppSettings, DiagnosticResult, AppTourStep, LatestScan
 } from "@/types";
 
 // -------- Initial sensible defaults --------
@@ -45,6 +45,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   openrouterModel: "auto",
 };
 
+interface TankCalibration {
+  empty: number | null;   // raw tank_level % when empty
+  full: number | null;    // raw tank_level % when full
+}
+
 interface VerdeStore {
   // ---- Connection / system ----
   connStatus: "connecting" | "live" | "off" | "error";
@@ -54,11 +59,12 @@ interface VerdeStore {
   appLoadTime: number;
   lastPollTs: number;
   pollCount: number;
+  newPhotoFlash: boolean;
 
   // ---- Core data ----
   sensors: Sensors;
   controls: Controls;
-  latestScan: { imageUrl?: string; ts?: number; metadata?: any };
+  latestScan: LatestScan;
   weather: Weather | null;
   weatherIcon: string;
   lastWeatherCheck: string | null;
@@ -104,6 +110,9 @@ interface VerdeStore {
   tourStep: number;
   tourActive: boolean;
   tourComplete: boolean;
+
+  // ---- Tank calibration (app-side remap, no reflash needed) ----
+  tankCalibration: TankCalibration;
 
   // ---- Settings ----
   settings: AppSettings;
@@ -151,6 +160,11 @@ interface VerdeStore {
   clearDiagnostics: () => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   resetSettings: () => void;
+  setTankEmpty: (raw: number) => void;
+  setTankFull: (raw: number) => void;
+  resetTankCalibration: () => void;
+  tankDisplayed: (raw: number | null | undefined) => number | null;
+  setNewPhotoFlash: (b: boolean) => void;
   startTour: () => void;
   nextTourStep: () => void;
   prevTourStep: () => void;
@@ -166,6 +180,8 @@ const initialState = {
   appLoadTime: Date.now(),
   lastPollTs: 0,
   pollCount: 0,
+  newPhotoFlash: false,
+  tankCalibration: { empty: null, full: null },
 
   sensors: {} as Sensors,
   controls: {} as Controls,
@@ -311,6 +327,31 @@ export const useVerdeStore = create<VerdeStore>()(
       updateSettings: (patch) => set(s => ({ settings: { ...s.settings, ...patch } })),
       resetSettings: () => set({ settings: DEFAULT_SETTINGS }),
 
+      setTankEmpty: (raw: number) => {
+        const cal = get().tankCalibration;
+        const next: TankCalibration = { ...cal, empty: raw };
+        set({ tankCalibration: next });
+        try { localStorage.setItem("verde_tank_cal", JSON.stringify(next)); } catch {}
+      },
+      setTankFull: (raw: number) => {
+        const cal = get().tankCalibration;
+        const next: TankCalibration = { ...cal, full: raw };
+        set({ tankCalibration: next });
+        try { localStorage.setItem("verde_tank_cal", JSON.stringify(next)); } catch {}
+      },
+      resetTankCalibration: () => {
+        set({ tankCalibration: { empty: null, full: null } });
+        try { localStorage.removeItem("verde_tank_cal"); } catch {}
+      },
+      tankDisplayed: (raw: number | null | undefined): number | null => {
+        if (raw == null || Number.isNaN(raw)) return null;
+        const { empty, full } = get().tankCalibration;
+        if (empty == null || full == null || full <= empty) return raw;
+        const pct = ((raw - empty) / (full - empty)) * 100;
+        return Math.max(0, Math.min(100, Math.round(pct)));
+      },
+      setNewPhotoFlash: (b: boolean) => set({ newPhotoFlash: b }),
+
       startTour: () => set({ tourActive: true, tourStep: 0, tourComplete: false }),
       nextTourStep: () => set(s => {
         if (s.tourStep >= TOUR_STEPS.length - 1) {
@@ -349,6 +390,11 @@ export const useVerdeStore = create<VerdeStore>()(
         try {
           const raw = localStorage.getItem("verde_history_v2");
           if (raw && state) (state as any).history = JSON.parse(raw);
+        } catch {}
+        // reload tank calibration
+        try {
+          const tc = localStorage.getItem("verde_tank_cal");
+          if (tc && state) (state as any).tankCalibration = JSON.parse(tc);
         } catch {}
       },
     }

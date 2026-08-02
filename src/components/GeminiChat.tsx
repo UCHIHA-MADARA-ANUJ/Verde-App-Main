@@ -18,6 +18,7 @@ export function GeminiChat() {
   const plantResult = useVerdeStore(s => s.plantResult);
   const sensors = useVerdeStore(s => s.sensors);
   const controls = useVerdeStore(s => s.controls);
+  const tankDisplayed = useVerdeStore(s => s.tankDisplayed);
   const addMsg = useVerdeStore(s => s.addGeminiMsg);
   const setBusy = useVerdeStore(s => s.setGeminiBusy);
   const setApiStatus = useVerdeStore(s => s.setApiStatus);
@@ -40,8 +41,10 @@ export function GeminiChat() {
     setApiStatus("gemini", "⏳ thinking…");
     try {
       const sys = "You are Verde AI, plant-care assistant. You can see the plant photo, Plant.id diagnosis (if available), and live ESP32 sensor data. Answer concisely, helpfully (2-4 sentences). Use numbers when relevant. Don't be robotic.";
+      const tankCal = tankDisplayed(sensors.tank_level);
+      const tankStr = tankCal != null ? `${Math.round(tankCal)}%` : `${sensors.tank_level ?? "?"}%`;
       const ctx = `Plant Doctor context: ${plantResult ? `${plantResult.name} (${plantResult.prob}% conf)${plantResult.disease ? `, issue: ${plantResult.disease.name}` : ""}.` : "No plant analysed yet."}
-Live telemetry: moisture=${sensors.moisture}%, temp=${sensors.temperature}°C, humidity=${sensors.humidity}%, tank=${sensors.tank_level}%, lux=${sensors.lux}, pump=${controls.pump_state}, mode=${controls.manual_mode?"MANUAL":"AUTO"}, thresholds: moisture=${controls.moisture_threshold}%, tank_lock=${controls.tank_threshold}%, light_threshold=${controls.light_threshold}%, rain_override=${controls.weather_override}.`;
+Live telemetry: moisture=${sensors.moisture}%, temp=${sensors.temperature}°C, humidity=${sensors.humidity}%, tank=${tankStr}, lux=${sensors.lux}, pump=${controls.pump_state}, mode=${controls.manual_mode?"MANUAL":"AUTO"}, thresholds: moisture=${controls.moisture_threshold}%, tank_lock=${controls.tank_threshold}%, light_threshold=${controls.light_threshold}%, rain_override=${controls.weather_override}.`;
       const text = await askGemini({
         imageDataUrls: currentImage ? [currentImage.dataUrl] : undefined,
         text: `${ctx}\n\nQuestion: ${q}`,

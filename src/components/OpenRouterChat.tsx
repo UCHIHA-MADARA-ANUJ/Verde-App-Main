@@ -18,6 +18,7 @@ export function OpenRouterChat() {
   const controls = useVerdeStore(s => s.controls);
   const weather = useVerdeStore(s => s.weather);
   const lastWeatherCheck = useVerdeStore(s => s.lastWeatherCheck);
+  const tankDisplayed = useVerdeStore(s => s.tankDisplayed);
   const addMsg = useVerdeStore(s => s.addOrMsg);
   const setBusy = useVerdeStore(s => s.setOrBusy);
   const setActiveModel = useVerdeStore(s => s.setOrActiveModel);
@@ -33,12 +34,14 @@ export function OpenRouterChat() {
     setBusy(true);
     setApiStatus("router", "⏳ thinking…");
 
+    const tankCal = tankDisplayed(sensors.tank_level);
+    const tankStr = tankCal != null ? `${Math.round(tankCal)}% (raw ${sensors.tank_level ?? "?"}%)` : `${sensors.tank_level ?? "?"}%`;
     const rain = weather?.rain_expected ? "RAIN DETECTED — watering suspended" : "clear";
     const sys = "You are Verde AI, assistant for Project Verde — a smart plant irrigation system. You have live ESP32 telemetry and controls. Be concise, accurate, conversational (2-4 sentences). Use the sensor numbers. If data is missing say so.";
     const ctx = `LIVE SYSTEM (weather: ${rain}, last check ${lastWeatherCheck || "none"}, ${weather?.description || "n/a"} ${weather?.temp != null ? weather.temp+"°C" : ""}):
 sensors: ${JSON.stringify(sensors)}
 controls: ${JSON.stringify(controls)}
-Interpretation: moisture ${sensors.moisture??"?"}% (auto-water below ${controls.moisture_threshold??35}%), tank ${sensors.tank_level??"?"}% (lock below ${controls.tank_threshold??15}%, 0=off), temp ${sensors.temperature??"?"}°C, humidity ${sensors.humidity??"?"}%, lux ${sensors.lux??"?"}, pump ${controls.manual_mode?"MANUAL":"AUTO"}, pump ${controls.pump_state?"ON":"OFF"}, light ${controls.light_manual_mode?"MANUAL":"AUTO"}, grow-light ${controls.grow_light_state?"ON":"OFF"}, rain-override ${controls.weather_override===1?"ACTIVE":"off"}.`;
+Interpretation: moisture ${sensors.moisture??"?"}% (auto-water below ${controls.moisture_threshold??35}%), tank ${tankStr} (lock below ${controls.tank_threshold??15}%, 0=off), temp ${sensors.temperature??"?"}°C, humidity ${sensors.humidity??"?"}%, lux ${sensors.lux??"?"}, pump ${controls.manual_mode?"MANUAL":"AUTO"}, pump ${controls.pump_state?"ON":"OFF"}, light ${controls.light_manual_mode?"MANUAL":"AUTO"}, grow-light ${controls.grow_light_state?"ON":"OFF"}, rain-override ${controls.weather_override===1?"ACTIVE":"off"}.`;
 
     try {
       const { text, model } = await askOpenRouter({

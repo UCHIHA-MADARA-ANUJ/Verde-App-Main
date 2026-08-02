@@ -8,6 +8,8 @@ import { Badge } from "./ui/Badge";
 export function HealthGauge() {
   const sensors = useVerdeStore(s => s.sensors);
   const controls = useVerdeStore(s => s.controls);
+  const tankDisplayed = useVerdeStore(s => s.tankDisplayed);
+  const tankVal = tankDisplayed(sensors.tank_level);
   const score = computeHealthScore(sensors, controls);
   let label = "Critical", color = "red", deg = 0;
   if (score >= 85) { label = "Excellent"; color = "green"; deg = 180; }
@@ -51,7 +53,7 @@ export function HealthGauge() {
       <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
         <div><div className="text-slate-500">WATER</div><div className={sensors.moisture != null && sensors.moisture >= (controls.moisture_threshold??35) ? "text-green-glow" : "text-amber"}>{sensors.moisture ?? "--"}%</div></div>
         <div><div className="text-slate-500">TEMP</div><div className={sensors.temperature != null && sensors.temperature >= 15 && sensors.temperature <= 32 ? "text-green-glow" : "text-amber"}>{sensors.temperature ?? "--"}°C</div></div>
-        <div><div className="text-slate-500">TANK</div><div className={sensors.tank_level != null && sensors.tank_level >= (controls.tank_threshold??15) ? "text-green-glow" : "text-red"}>{sensors.tank_level ?? "--"}%</div></div>
+        <div><div className="text-slate-500">TANK</div><div className={tankVal != null && tankVal >= (controls.tank_threshold??15) ? "text-green-glow" : "text-red"}>{tankVal != null ? Math.round(tankVal) : "--"}%</div></div>
       </div>
     </Card>
   );

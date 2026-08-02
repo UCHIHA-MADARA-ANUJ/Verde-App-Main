@@ -26,11 +26,17 @@ const TILES: TileDef[] = [
 export function TelemetryCard() {
   const sensors = useVerdeStore(s => s.sensors);
   const controls = useVerdeStore(s => s.controls);
+  const tankCal = useVerdeStore(s => s.tankCalibration);
+  const tankDisplayed = useVerdeStore(s => s.tankDisplayed);
+  const setTankEmpty = useVerdeStore(s => s.setTankEmpty);
+  const setTankFull = useVerdeStore(s => s.setTankFull);
+  const resetTankCalibration = useVerdeStore(s => s.resetTankCalibration);
   const predict = useVerdeStore(s => {
     // compute predicted actuator states
     const S = s.sensors, C = s.controls;
     const m = S.moisture ?? 0;
-    const tank = S.tank_level ?? 0;
+    const rawTank = S.tank_level;
+    const tank = s.tankDisplayed(rawTank) ?? 0;
     const tankTh = C.tank_threshold ?? 15;
     const moistTh = C.moisture_threshold ?? 35;
     const lightTh = C.light_threshold ?? 35;
@@ -47,7 +53,7 @@ export function TelemetryCard() {
     const dark = luxPct<lightTh;
     if (C.light_manual_mode){ lightOn=!!C.grow_light_state; lightReason="MANUAL"; }
     else { lightOn=dark; lightReason="AUTO"+(dark?` · dark (${Math.round(luxPct)}%<${lightTh}%)`:` · bright (${Math.round(luxPct)}%)`); }
-    return { pumpOn, pumpReason, lightOn, lightReason, mode:`pump:${C.manual_mode?"MAN":"AUTO"} · light:${C.light_manual_mode?"MAN":"AUTO"}` };
+    return { pumpOn, pumpReason, lightOn, lightReason, mode:`pump:${C.manual_mode?"MAN":"AUTO"} · light:${C.light_manual_mode?"MAN":"AUTO"}`, tank };
   });
   const setControls = useVerdeStore(s => s.setControls);
   const log = useVerdeStore(s => s.log);
@@ -71,9 +77,15 @@ export function TelemetryCard() {
 
   const getVal = (key: string): number => {
     if (key === "uploads") return sensors.successful_uploads ?? 0;
+    if (key === "tank_level") {
+      const cal = tankDisplayed(sensors.tank_level);
+      return cal ?? 0;
+    }
     const v = (sensors as any)[key];
     return typeof v === "number" ? v : 0;
   };
+  const tankRawVal = typeof sensors.tank_level === "number" ? sensors.tank_level : null;
+  const tankCalVal = tankDisplayed(tankRawVal);
   const colorClass = (c: string) => ({
     sky: "before:bg-sky text-sky", green: "before:bg-green text-green-glow",
     purple: "before:bg-purple text-purple-glow", amber: "before:bg-amber text-amber",
@@ -82,7 +94,10 @@ export function TelemetryCard() {
   const tileValueColor = (key: string, v: number) => {
     if (v === 0 && (sensors as any)[key] === undefined) return "text-slate-600";
     if (key === "moisture") return v < (controls.moisture_threshold ?? 35) ? "text-amber" : "text-green-glow";
-    if (key === "tank_level") return v < (controls.tank_threshold ?? 15) ? "text-red" : "text-green-glow";
+    if (key === "tank_level") {
+      const disp = tankCalVal ?? v;
+      return disp < (controls.tank_threshold ?? 15) ? "text-red" : "text-green-glow";
+    }
     if (key === "temperature") return v > 38 ? "text-red" : v < 10 ? "text-sky" : "text-white";
     if (key === "voltage_sag") return v < 4.2 ? "text-red" : v > 5.5 ? "text-red" : "text-green-glow";
     return "text-white";
@@ -134,6 +149,45 @@ export function TelemetryCard() {
             </div>
           );
         })}
+      </div>
+
+      {/* Tank Calibration */}
+      <div className="mt-2 rounded-xl border border-amber/30 bg-amber/5 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Gauge className="w-3.5 h-3.5 text-amber" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-amber">
+            🛢 Tank Calibration (app-side — no reflash)
+          </span>
+        </div>
+        <div className="text-[11px] text-slate-300">
+          Raw: <b className="font-mono text-white">{tankRawVal ?? "--"}%</b>
+          {" → "}Displayed: <b className="font-mono text-green-glow">{tankCalVal != null ? Math.round(tankCalVal) + "%" : "--"}</b>
+          {(tankCal.empty != null || tankCal.full != null) && (
+            <span className="text-slate-500 font-mono ml-2">
+              [empty:{tankCal.empty ?? "?"}% · full:{tankCal.full ?? "?"}%]
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2 mt-2 flex-wrap">
+          <button
+            onClick={() => { if (tankRawVal != null) { setTankEmpty(tankRawVal); sfx.click(); log("info","calibration",`SET EMPTY @ raw ${tankRawVal}%`); pushNotification({level:"ok",title:"Tank empty point set",body:`Raw ${tankRawVal}% = 0%`});} }}
+            className="text-[10px] font-mono font-bold px-2.5 py-1.5 rounded-md border border-red/40 bg-red/10 text-red hover:bg-red/20 transition">
+            📉 SET EMPTY (0%)
+          </button>
+          <button
+            onClick={() => { if (tankRawVal != null) { setTankFull(tankRawVal); sfx.click(); log("info","calibration",`SET FULL @ raw ${tankRawVal}%`); pushNotification({level:"ok",title:"Tank full point set",body:`Raw ${tankRawVal}% = 100%`});} }}
+            className="text-[10px] font-mono font-bold px-2.5 py-1.5 rounded-md border border-green/40 bg-green/10 text-green-glow hover:bg-green/20 transition">
+            📈 SET FULL (100%)
+          </button>
+          <button
+            onClick={() => { resetTankCalibration(); sfx.toggle(); log("info","calibration","Tank calibration reset"); }}
+            className="text-[10px] font-mono font-bold px-2.5 py-1.5 rounded-md border border-slate-600 bg-slate-800/40 text-slate-300 hover:bg-slate-700 transition">
+            ↺ RESET
+          </button>
+        </div>
+        <div className="text-[10px] text-amber/80 font-mono mt-1.5">
+          Tip: empty bucket → SET EMPTY · fill to desired max → SET FULL. App remaps instantly.
+        </div>
       </div>
 
       <div className="space-y-0.5">

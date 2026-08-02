@@ -10,7 +10,10 @@ export function QuickStats() {
   const plants = useVerdeStore(s => s.plants);
   const history = useVerdeStore(s => s.history);
   const weather = useVerdeStore(s => s.weather);
+  const tankDisplayed = useVerdeStore(s => s.tankDisplayed);
+  const tankTh = useVerdeStore(s => s.controls.tank_threshold ?? 15);
   const uptime = Date.now() - useVerdeStore(s => s.appLoadTime);
+  const tankVal = tankDisplayed(sensors.tank_level) ?? 0;
 
   const stats = [
     {
@@ -39,9 +42,9 @@ export function QuickStats() {
     },
     {
       icon: Gauge, label: "Tank Level",
-      value: sensors.tank_level ?? 0, suffix: "%",
-      sub: sensors.tank_level != null ? (sensors.tank_level < 15 ? "Refill soon!" : "OK") : "no sensor",
-      color: sensors.tank_level != null ? (sensors.tank_level < 15 ? "red" : "sky") : "slate",
+      value: tankVal, suffix: "%",
+      sub: sensors.tank_level != null ? (tankVal < tankTh ? "Refill soon!" : "OK") : "no sensor",
+      color: sensors.tank_level != null ? (tankVal < tankTh ? "red" : "sky") : "slate",
     },
     {
       icon: Clock, label: "Uptime",

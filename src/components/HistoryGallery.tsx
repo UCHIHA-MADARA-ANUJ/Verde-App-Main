@@ -9,7 +9,7 @@ import { Badge } from "./ui/Badge";
 import { Modal } from "./ui/Modal";
 import { Input, Terminal } from "./ui/Terminal";
 import { askGemini } from "@/lib/services";
-import { formatRelative } from "@/lib/utils";
+import { formatRelative, cn } from "@/lib/utils";
 import { sfx } from "@/lib/sound";
 import type { HistoryItem } from "@/types";
 
@@ -71,7 +71,7 @@ export function HistoryGallery() {
           {history.map(h => (
             <div key={h.id} className="thumb group" onClick={() => open(h)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={h.image.dataUrl} alt="" />
+              <img src={h.image.dataUrl} alt="" className={cn(h.image.source === "cam" && "rotate-180")} />
               <div className="thumb-label">
                 {h.result?.name?.slice(0, 12) || "?"}
                 <span className="block text-[9px] text-green-glow">{formatRelative(h.ts)}</span>
@@ -93,7 +93,7 @@ export function HistoryGallery() {
         {active && (
           <div className="space-y-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={active.image.dataUrl} alt="" className="w-full max-h-64 object-contain bg-black rounded-xl border border-border" />
+            <img src={active.image.dataUrl} alt="" className={cn("w-full max-h-64 object-contain bg-black rounded-xl border border-border", active.image.source === "cam" && "rotate-180")} />
             {active.result && (
               <div className="rounded-xl border border-green/30 bg-green/5 p-4">
                 <div className="text-sm font-bold text-green-glow flex flex-wrap items-center gap-2">
