@@ -1,77 +1,103 @@
 "use client";
 import { Brain, Send, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { ChatMsg } from "@/hooks/useVerde";
-import type { VerdeImage } from "@/types";
+import { useVerdeStore } from "@/store/verde-store";
+import { Card, CardHeader, CardTitle } from "./ui/Card";
+import { Badge } from "./ui/Badge";
+import { Button } from "./ui/Button";
+import { Input, Terminal } from "./ui/Terminal";
+import { askGemini } from "@/lib/services";
+import { sfx } from "@/lib/sound";
 
-export function GeminiChat({
-  msgs, busy, currentImage, onSend,
-}: {
-  msgs: ChatMsg[];
-  busy: boolean;
-  currentImage: VerdeImage | null;
-  onSend: (q: string) => void;
-}) {
+export function GeminiChat() {
   const [input, setInput] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
+  const msgs = useVerdeStore(s => s.geminiMsgs);
+  const busy = useVerdeStore(s => s.geminiBusy);
+  const currentImage = useVerdeStore(s => s.currentImage);
+  const plantResult = useVerdeStore(s => s.plantResult);
+  const sensors = useVerdeStore(s => s.sensors);
+  const controls = useVerdeStore(s => s.controls);
+  const addMsg = useVerdeStore(s => s.addGeminiMsg);
+  const setBusy = useVerdeStore(s => s.setGeminiBusy);
+  const setApiStatus = useVerdeStore(s => s.setApiStatus);
+  const log = useVerdeStore(s => s.log);
 
   useEffect(() => {
-    if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
+    if (boxRef.current) {
+      const el = boxRef.current.closest(".terminal") as HTMLElement;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
   }, [msgs, busy]);
 
-  const submit = () => {
-    if (!input.trim() || busy) return;
-    onSend(input.trim());
+  const submit = async () => {
+    const q = input.trim();
+    if (!q || busy) return;
     setInput("");
+    sfx.click();
+    addMsg({ who: "you", text: q, ts: Date.now() });
+    setBusy(true);
+    setApiStatus("gemini", "⏳ thinking…");
+    try {
+      const sys = "You are Verde AI, plant-care assistant. You can see the plant photo, Plant.id diagnosis (if available), and live ESP32 sensor data. Answer concisely, helpfully (2-4 sentences). Use numbers when relevant. Don't be robotic.";
+      const ctx = `Plant Doctor context: ${plantResult ? `${plantResult.name} (${plantResult.prob}% conf)${plantResult.disease ? `, issue: ${plantResult.disease.name}` : ""}.` : "No plant analysed yet."}
+Live telemetry: moisture=${sensors.moisture}%, temp=${sensors.temperature}°C, humidity=${sensors.humidity}%, tank=${sensors.tank_level}%, lux=${sensors.lux}, pump=${controls.pump_state}, mode=${controls.manual_mode?"MANUAL":"AUTO"}, thresholds: moisture=${controls.moisture_threshold}%, tank_lock=${controls.tank_threshold}%, light_threshold=${controls.light_threshold}%, rain_override=${controls.weather_override}.`;
+      const text = await askGemini({
+        imageDataUrls: currentImage ? [currentImage.dataUrl] : undefined,
+        text: `${ctx}\n\nQuestion: ${q}`,
+        system: sys,
+      });
+      addMsg({ who: "ai", text, ts: Date.now() });
+      setApiStatus("gemini", "✅ responded");
+      sfx.success();
+    } catch(e:any) {
+      addMsg({ who: "sys", text: `ERR: ${e.message}`, ts: Date.now() });
+      setApiStatus("gemini", `❌ ${e.message.slice(0,40)}`);
+      log("err", "gemini", e.message);
+      sfx.error();
+    } finally { setBusy(false); }
   };
 
-  return (
-    <div className="glass-card p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="flex items-center gap-2 font-mono text-xs font-bold tracking-widest uppercase text-sky">
-          <Brain className="w-3.5 h-3.5" /> Gemini 2.5 Flash — Vision Chat
-        </h2>
-        <span className={`badge ${currentImage ? "badge-green" : "badge-amber"}`}>
-          {currentImage ? "👁 image loaded" : "no image"}
-        </span>
-      </div>
+  const quickQs = [
+    "What disease might this be?",
+    "How should I treat it?",
+    "Is it getting enough light?",
+    "When should I water it?",
+  ];
 
-      <div ref={boxRef} className="terminal h-48 overflow-y-auto text-[12px] leading-relaxed">
-        {msgs.map(m => (
-          <div key={m.id} className="terminal-entry mb-2">
-            {m.who === "you" && <div><span className="text-purple-glow font-bold">YOU ▸ </span><span className="text-slate-200">{m.text}</span></div>}
-            {m.who === "ai" && <div><span className="text-green-glow font-bold">VERDE AI ▸ </span><span className="text-green-glow/90 whitespace-pre-wrap">{m.text}</span></div>}
-            {m.who === "sys" && <div className="text-slate-400 whitespace-pre-wrap">{m.text}</div>}
-          </div>
-        ))}
-        {busy && (
-          <div className="flex items-center gap-2 text-green-glow">
-            <Loader2 className="w-3 h-3 animate-spin" /> thinking<span className="animate-blink">▊</span>
-          </div>
-        )}
-      </div>
+  return (
+    <Card accent="green">
+      <CardHeader>
+        <CardTitle icon={Brain} color="green">Gemini 2.0 Flash — Vision Chat</CardTitle>
+        <Badge color={currentImage ? "green" : "amber"} dot={!!currentImage} pulse={!!currentImage}>
+          {currentImage ? "👁 image loaded" : "no image"}
+        </Badge>
+      </CardHeader>
+
+      <Terminal
+        lines={msgs.map(m => ({ who: m.who as any, text: m.text, meta: m.meta }))}
+        heightClass="h-52"
+      />
 
       <div className="flex gap-2 mt-3">
-        <input className="input flex-1" placeholder={currentImage ? "Ask about this plant photo…" : "Type a question…"}
-          value={input} onChange={e => setInput(e.target.value)}
+        <Input value={input} onChange={e => setInput(e.target.value)}
+          placeholder={currentImage ? "Ask about this plant photo…" : "Ask anything about plants, sensors, care…"}
           onKeyDown={e => { if (e.key === "Enter") submit(); }} />
-        <button className="btn btn-green" onClick={submit} disabled={busy || !input.trim()}>
-          <Send className="w-3.5 h-3.5" /> ASK
-        </button>
+        <Button variant="green" onClick={submit} disabled={busy || !input.trim()}>
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+          ASK
+        </Button>
       </div>
+
       <div className="mt-2 flex flex-wrap gap-2">
-        {[
-          "What disease might this be?",
-          "How should I treat it?",
-          "Is it getting enough light?",
-          "When should I water it?",
-        ].map(q => (
-          <button key={q} className="text-[10px] font-mono px-2 py-1 rounded-md border border-border text-slate-400 hover:border-green hover:text-green-glow transition"
+        {quickQs.map(q => (
+          <button key={q}
+            className="text-[10px] font-mono px-2 py-1 rounded-md border border-border text-slate-400 hover:border-green hover:text-green-glow transition"
             onClick={() => { setInput(q); setTimeout(submit, 50); }}>
             {q}
           </button>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
