@@ -111,10 +111,10 @@ export async function askGemini(opts: {
     parts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } });
   }
   parts.push({ text: (opts.system ? opts.system + "\n\n" : "") + opts.text });
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${config.geminiKey}`;
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
   const r = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-goog-api-key": config.geminiKey },
     body: JSON.stringify({ contents: [{ parts }] }),
   });
   const j = await r.json();

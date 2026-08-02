@@ -3,17 +3,23 @@
 The ultimate smart-plant dashboard: live ESP32 telemetry, AI plant doctor (Plant.id / Crop.health), Gemini vision chat, OpenRouter sensor-aware chat, weather auto-override, and more.
 
 > Built with **Next.js 14 (App Router) + TypeScript + Tailwind CSS + Framer Motion + Recharts**.
+> **All API keys are pre-configured** — just install and run.
 
 ## Quick start
 
 ```bash
 npm install
-npm run dev       # http://localhost:3000
-npm run build     # production build
-npm start         # serve production build
+npm run dev       # → http://localhost:3000
 ```
 
-Copy `.env.example` → `.env.local` and paste your API keys. (Defaults from the prototype are pre-filled for testing.)
+That's it. No `.env` setup, no config files needed.
+
+## Production
+
+```bash
+npm run build
+npm start
+```
 
 ## Features
 
@@ -29,7 +35,7 @@ Copy `.env.example` → `.env.local` and paste your API keys. (Defaults from the
 ### 🌦️ Weather Auto-Override (OpenWeather)
 - Auto-fetches Delhi weather every 10 minutes
 - Writes weather data back to Firebase `/weather`
-- Automatically sets `weather_override=1` when rain is forecast (thunderstorm/drizzle/rain/snow codes)
+- Automatically sets `weather_override=1` when rain is forecast
 - Manual "check now" button
 - Shows icon, temp, description, humidity, wind, last-check time
 
@@ -104,23 +110,22 @@ src/
 ├── hooks/
 │   └── useVerde.ts       # central state + all API logic
 ├── lib/
-│   ├── config.ts         # env var loader
+│   ├── config.ts         # all keys + constants (EDIT HERE TO CHANGE KEYS)
 │   ├── verde.ts          # API helpers, sound FX, notifs, prediction logic
 │   └── cn.ts             # className helper
 ├── styles/
-│   └── globals.css       # Tailwind + custom hand-tuned CSS (no AI slop)
+│   └── globals.css       # Tailwind + custom hand-tuned CSS
 └── types/
     └── index.ts          # full TS types
 ```
 
-## API keys (⚠️ rotate these before public deployment!)
+## Configured APIs
 
-All keys are in `.env.local` and prefixed `NEXT_PUBLIC_` so they're available in the browser. This matches your prototype's approach. For production, proxy calls through Next.js API routes so keys never reach the client.
-
-Current endpoints:
 - **Firebase RTDB** — `verde-tech-haha-default-rtdb.asia-southeast1.firebasedatabase.app`
-- **Gemini 2.5 Flash** — generativelanguage.googleapis.com
+- **Gemini 2.5 Flash** — `generativelanguage.googleapis.com` (AQ key)
 - **OpenWeather** — Delhi weather every 10 min
 - **OpenRouter** — 6 free-model fallback chain
 - **Crop.health / Plant.id (Kindwise)** — plant + disease identification
 - **Device camera** — native `capture="environment"` (no API needed)
+
+To swap any key, edit `src/lib/config.ts`.
