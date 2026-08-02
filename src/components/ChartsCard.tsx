@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 import { TrendingUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useVerdeStore } from "@/store/verde-store";
@@ -6,10 +7,11 @@ import { Card, CardHeader, CardTitle } from "./ui/Card";
 import { Badge } from "./ui/Badge";
 
 export function ChartsCard() {
-  const data = useVerdeStore(s => s.sensorHistory).map((p, i) => ({
+  const sensorHistory = useVerdeStore(s => s.sensorHistory);
+  const data = useMemo(() => sensorHistory.map((p, i) => ({
     i, t: new Date(p.ts).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false }),
     moisture: p.moisture, temp: p.temperature, humidity: p.humidity, tank: p.tank_level,
-  }));
+  })), [sensorHistory]);
 
   return (
     <Card accent="sky">
