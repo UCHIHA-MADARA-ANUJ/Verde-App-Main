@@ -8,8 +8,7 @@ import { Badge } from "./ui/Badge";
 import { setCtrl } from "@/lib/services";
 import { sfx } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
 type TileDef = { key: string; label: string; suffix: string; icon: any; color: string; max: number; unit?: string };
 
 const TILES: TileDef[] = [
@@ -31,34 +30,50 @@ export function TelemetryCard() {
   const setTankEmpty = useVerdeStore(s => s.setTankEmpty);
   const setTankFull = useVerdeStore(s => s.setTankFull);
   const resetTankCalibration = useVerdeStore(s => s.resetTankCalibration);
-  const predict = useVerdeStore(s => {
-    // compute predicted actuator states
-    const S = s.sensors, C = s.controls;
+  const setControls = useVerdeStore(s => s.setControls);
+  const log = useVerdeStore(s => s.log);
+  const setApiStatus = useVerdeStore(s => s.setApiStatus);
+  const pushNotification = useVerdeStore(s => s.pushNotification);
+
+  const predict = useMemo(() => {
+    const S = sensors;
+    const C = controls;
     const m = S.moisture ?? 0;
     const rawTank = S.tank_level;
-    const tank = s.tankDisplayed(rawTank) ?? 0;
+    const tank = tankDisplayed(rawTank) ?? 0;
     const tankTh = C.tank_threshold ?? 15;
     const moistTh = C.moisture_threshold ?? 35;
     const lightTh = C.light_threshold ?? 35;
     const luxPct = (S.lux ?? 0) / 10;
     const rain = C.weather_override === 1;
-    let pumpOn=false,pumpReason="",lightOn=false,lightReason="";
-    if (C.manual_mode){
-      pumpOn = !!C.pump_state && (tankTh===0||tank>=tankTh);
-      pumpReason = "MANUAL"+(pumpOn?" → ON 💦":" → OFF")+(tank<tankTh&&tankTh>0?" · tank lock":"");
+    let pumpOn = false, pumpReason = "", lightOn = false, lightReason = "";
+
+    if (C.manual_mode) {
+      pumpOn = !!C.pump_state && (tankTh === 0 || tank >= tankTh);
+      pumpReason = "MANUAL" + (pumpOn ? " → ON 💦" : " → OFF") + (tank < tankTh && tankTh > 0 ? " · tank lock" : "");
     } else {
-      pumpOn = m<moistTh && (tankTh===0||tank>=tankTh) && !rain;
-      pumpReason = "AUTO"+(m<moistTh?` · dry (${m}%<${moistTh}%)`:` · wet (${m}%)`)+(tank<tankTh&&tankTh>0?" · tank lock":"")+(rain?" · RAIN":"");
+      pumpOn = m < moistTh && (tankTh === 0 || tank >= tankTh) && !rain;
+      pumpReason = "AUTO" + (m < moistTh ? ` · dry (${m}%<${moistTh}%)` : ` · wet (${m}%)`) + (tank < tankTh && tankTh > 0 ? " · tank lock" : "") + (rain ? " · RAIN" : "");
     }
-    const dark = luxPct<lightTh;
-    if (C.light_manual_mode){ lightOn=!!C.grow_light_state; lightReason="MANUAL"; }
-    else { lightOn=dark; lightReason="AUTO"+(dark?` · dark (${Math.round(luxPct)}%<${lightTh}%)`:` · bright (${Math.round(luxPct)}%)`); }
-    return { pumpOn, pumpReason, lightOn, lightReason, mode:`pump:${C.manual_mode?"MAN":"AUTO"} · light:${C.light_manual_mode?"MAN":"AUTO"}`, tank };
-  });
-  const setControls = useVerdeStore(s => s.setControls);
-  const log = useVerdeStore(s => s.log);
-  const setApiStatus = useVerdeStore(s => s.setApiStatus);
-  const pushNotification = useVerdeStore(s => s.pushNotification);
+
+    const dark = luxPct < lightTh;
+    if (C.light_manual_mode) {
+      lightOn = !!C.grow_light_state;
+      lightReason = "MANUAL";
+    } else {
+      lightOn = dark;
+      lightReason = "AUTO" + (dark ? ` · dark (${Math.round(luxPct)}%<${lightTh}%)` : ` · bright (${Math.round(luxPct)}%)`);
+    }
+
+    return {
+      pumpOn,
+      pumpReason,
+      lightOn,
+      lightReason,
+      mode: `pump:${C.manual_mode ? "MAN" : "AUTO"} · light:${C.light_manual_mode ? "MAN" : "AUTO"}`,
+      tank,
+    };
+  }, [sensors, controls, tankDisplayed]);
 
   const doSetCtrl = async (k: string, v: any) => {
     sfx.toggle();

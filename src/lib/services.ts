@@ -195,7 +195,7 @@ export function parseKindwiseResult(j: any) {
 // ==================== GEMINI ====================
 const GEMINI_MODEL = "gemini-2.0-flash";
 // backup model list for failover
-const GEMINI_FALLBACK = ["gemini-2.0-flash","gemini-2.0-flash-lite","gemini-1.5-flash"];
+const GEMINI_FALLBACK = ["gemini-2.0-flash","gemini-2.0-flash-lite"];
 
 export interface GeminiPart { text?: string; inline_data?: { mime_type: string; data: string }; }
 
@@ -222,6 +222,7 @@ export async function askGemini(opts: {
 
   const models = opts.model ? [opts.model, ...GEMINI_FALLBACK.filter(m => m !== opts.model)] : GEMINI_FALLBACK;
   let lastErr: any = null;
+  let quotaError = false;
   for (const model of models) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -239,7 +240,9 @@ export async function askGemini(opts: {
       });
       const j = await r.json();
       if (!r.ok) {
-        lastErr = new Error(j.error?.message || JSON.stringify(j).slice(0,120));
+        lastErr = new Error(j.error?.message || `HTTP ${r.status}`);
+        quotaError = /quota|exceeded/i.test(lastErr.message);
+        if (quotaError) break;
         continue;
       }
       const text = j.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -247,8 +250,30 @@ export async function askGemini(opts: {
       return text;
     } catch (e: any) {
       lastErr = e;
+      if (e.message?.toLowerCase().includes("quota")) {
+        quotaError = true;
+        break;
+      }
     }
   }
+
+  if (quotaError) {
+    try {
+      const prompt = `Gemini failed due to quota. Please answer this using only the text context below.\n\n${opts.text}`;
+      const sys = opts.system ?? "You are Verde AI, a plant-care assistant. Answer concisely and helpfully.";
+      const { text } = await askOpenRouter({
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+      });
+      return text;
+    } catch (openErr: any) {
+      throw new Error(`Gemini quota exceeded and OpenRouter fallback failed: ${openErr.message}`);
+    }
+  }
+
   throw lastErr || new Error("Gemini failed on all models");
 }
 
